@@ -58,6 +58,7 @@ export default function RootLayout({
           <input type="text" name="etat_structurel" />
           <input type="text" name="nombre_lots" />
           <input type="text" name="compteurs_individuels" />
+          <input type="text" name="nombre_compteurs" />
           <input type="text" name="detail_lots" />
           <input type="text" name="devis_globaux" />
           <input type="text" name="montant_devis_globaux" />

@@ -68,6 +68,7 @@ interface FormData {
   // B3
   nombre_lots?: string;
   compteurs_individuels?: string;
+  nombre_compteurs?: string;
   detail_lots?: string;
   devis_globaux?: string;
   montant_devis_globaux?: string;
@@ -766,13 +767,20 @@ export default function VendresonbienFunnel() {
                 <TextInput name="nombre_lots" placeholder="Ex: 4" type="number" required />
               </div>
               <div>
-                <FieldLabel required>Les compteurs (Eau/Électricité) sont-ils individuels ?</FieldLabel>
+                <FieldLabel required>Les compteurs électriques sont-ils individuels ?</FieldLabel>
                 <div className="space-y-3">
                   <RadioOption name="compteurs_individuels" value="Oui" label="Oui" emoji="✅" />
-                  <RadioOption name="compteurs_individuels" value="Non" label="Non" emoji="❌" />
-                  <RadioOption name="compteurs_individuels" value="Partiel" label="Partiel" emoji="⚡" />
+                  <RadioOption name="compteurs_individuels" value="Non" label="Non (Compteur commun)" emoji="❌" />
+                  <RadioOption name="compteurs_individuels" value="Partiel" label="Partiel / Sous-compteurs" emoji="⚡" />
                 </div>
               </div>
+
+              {data.compteurs_individuels && data.compteurs_individuels !== "Non" && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
+                  <FieldLabel>Nombre de compteurs électriques (Si connu)</FieldLabel>
+                  <TextInput name="nombre_compteurs" placeholder="Ex: 3" type="number" />
+                </motion.div>
+              )}
               
               {/* RENDU DYNAMIQUE DES LOTS */}
               {numLots > 0 && numLots <= 50 && (
