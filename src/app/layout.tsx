@@ -43,7 +43,7 @@ export default function RootLayout({
           <input type="text" name="statut_bien" />
           <input type="text" name="loyer_mensuel" />
           <input type="text" name="type_bail" />
-          <input type="text" name="fin_bail" />
+          <input type="text" name="debut_bail" />
           <input type="text" name="loyer_estime" />
           <input type="text" name="ca_annuel" />
           <input type="text" name="gestion_menage" />

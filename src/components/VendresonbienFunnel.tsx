@@ -51,7 +51,7 @@ interface FormData {
   statut_bien?: string;
   loyer_mensuel?: string;
   type_bail?: string;
-  fin_bail?: string;
+  debut_bail?: string;
   loyer_estime?: string;
   ca_annuel?: string;
   gestion_menage?: string;
@@ -82,6 +82,7 @@ interface FormData {
   telephone?: string;
   email?: string;
   contexte_vente?: string;
+  [key: string]: any;
 }
 
 // ─── PROGRESS ───────────────────────────────────────
@@ -265,9 +266,57 @@ export default function VendresonbienFunnel() {
   const submitToNetlify = async () => {
     const formBody = new URLSearchParams();
     formBody.append("form-name", "mybase-vendresonbien");
-    Object.entries(data).forEach(([key, value]) => {
-      if (value !== undefined) {
-        formBody.append(key, Array.isArray(value) ? value.join(", ") : value);
+
+    let finalData = { ...data };
+    
+    // Format dynamic lots for Path B
+    if (finalData.type_proposition === "multi-lots" && finalData.nombre_lots) {
+      const numLots = parseInt(finalData.nombre_lots as string) || 0;
+      let generatedDetails = "";
+      
+      for (let i = 1; i <= numLots; i++) {
+        const type = finalData[`lot_${i}_type`] || "Non précisé";
+        const surface = finalData[`lot_${i}_surface`] ? `${finalData[`lot_${i}_surface`]}m²` : "";
+        const etat = finalData[`lot_${i}_etat`] || "";
+        const dpe = finalData[`lot_${i}_dpe`] ? `DPE ${finalData[`lot_${i}_dpe`]}` : "";
+        const statut = finalData[`lot_${i}_statut`] || "Non précisé";
+        
+        let rentDetails = "";
+        if (statut === "Loué") {
+          const loyer = finalData[`lot_${i}_loyer`] || "?";
+          const bail = finalData[`lot_${i}_type_bail`] || "Non précisé";
+          const debut = finalData[`lot_${i}_debut_bail`] || "?";
+          rentDetails = `Loué ${loyer}€ (${bail}) [Début: ${debut}]`;
+        } else if (statut === "Vide") {
+          const loyerEstime = finalData[`lot_${i}_loyer_estime`] || "?";
+          rentDetails = `Vide (Estimé: ${loyerEstime}€)`;
+        } else {
+          rentDetails = statut;
+        }
+
+        const travaux = finalData[`lot_${i}_travaux`] ? `| Travaux: ${finalData[`lot_${i}_travaux`]}` : "";
+
+        const parts = [type, surface, etat, dpe, rentDetails].filter(Boolean).join(" | ");
+        generatedDetails += `Lot ${i}: ${parts} ${travaux}\n`;
+        
+        // Clean up temporary dynamic keys
+        delete finalData[`lot_${i}_type`];
+        delete finalData[`lot_${i}_surface`];
+        delete finalData[`lot_${i}_etat`];
+        delete finalData[`lot_${i}_dpe`];
+        delete finalData[`lot_${i}_statut`];
+        delete finalData[`lot_${i}_loyer`];
+        delete finalData[`lot_${i}_type_bail`];
+        delete finalData[`lot_${i}_debut_bail`];
+        delete finalData[`lot_${i}_loyer_estime`];
+        delete finalData[`lot_${i}_travaux`];
+      }
+      finalData.detail_lots = generatedDetails.trim();
+    }
+
+    Object.entries(finalData).forEach(([key, value]) => {
+      if (value !== undefined && value !== "") {
+        formBody.append(key, Array.isArray(value) ? value.join(", ") : String(value));
       }
     });
 
@@ -537,8 +586,8 @@ export default function VendresonbienFunnel() {
                     <Select name="type_bail" options={["Nu", "Meublé"]} />
                   </div>
                   <div>
-                    <FieldLabel>Fin du bail</FieldLabel>
-                    <TextInput name="fin_bail" placeholder="JJ/MM/AAAA" />
+                    <FieldLabel>Début du bail</FieldLabel>
+                    <TextInput name="debut_bail" placeholder="JJ/MM/AAAA" />
                   </div>
                 </motion.div>
               )}
@@ -706,9 +755,10 @@ export default function VendresonbienFunnel() {
         );
 
       // ─── B3 : COMPOSITION DES LOTS & REVENUS ───
-      case "B3":
+      case "B3": {
+        const numLots = parseInt((data.nombre_lots as string) || "0");
         return (
-          <motion.div key="B3" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="max-w-2xl mx-auto space-y-6">
+          <motion.div key="B3" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="max-w-3xl mx-auto space-y-6">
             <ScreenTitle title="Composition des lots & Revenus" subtitle="Détaillez chaque lot pour permettre une analyse précise." />
             <div className="bg-gray-900 p-6 md:p-8 rounded-3xl border border-gray-800 space-y-5">
               <div>
@@ -723,33 +773,114 @@ export default function VendresonbienFunnel() {
                   <RadioOption name="compteurs_individuels" value="Partiel" label="Partiel" emoji="⚡" />
                 </div>
               </div>
-              <div>
-                <FieldLabel required>Détail des Lots</FieldLabel>
-                <div className="bg-gray-800/50 p-4 rounded-xl mb-3 border border-gray-700">
-                  <p className="text-xs text-gray-400 mb-2 font-medium">📋 Modèle à copier-coller pour chaque lot :</p>
-                  <p className="text-xs text-amber-400/80 font-mono">Lot 1 : Type (T2) | Surface (45m²) | État (Bon) | DPE (D) | Loué (600€) ou Vide (Estimé 650€)</p>
+              
+              {/* RENDU DYNAMIQUE DES LOTS */}
+              {numLots > 0 && numLots <= 50 && (
+                <div className="space-y-6 mt-8">
+                  {Array.from({ length: numLots }).map((_, idx) => {
+                    const i = idx + 1;
+                    const statut = data[`lot_${i}_statut`] as string;
+                    return (
+                      <div key={i} className="p-5 border border-amber-500/20 bg-gray-950 rounded-2xl space-y-4 shadow-inner">
+                        <h4 className="text-amber-500 font-bold mb-3 flex items-center gap-2"><Layers className="w-5 h-5"/> Lot n°{i}</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <FieldLabel required>Type (T1, T2...)</FieldLabel>
+                            <Select name={`lot_${i}_type`} options={["Studio", "T1", "T2", "T3", "T4", "T5+", "Local commercial"]} />
+                          </div>
+                          <div>
+                            <FieldLabel>Surface (m²)</FieldLabel>
+                            <TextInput name={`lot_${i}_surface`} type="number" placeholder="Facultatif" />
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <FieldLabel>État général</FieldLabel>
+                            <Select name={`lot_${i}_etat`} options={["Excellent / Rénové", "Bon état", "Rafraichissement", "Gros travaux"]} placeholder="Facultatif" />
+                          </div>
+                          <div>
+                            <FieldLabel>DPE (Si connu)</FieldLabel>
+                            <Select name={`lot_${i}_dpe`} options={["A", "B", "C", "D", "E", "F", "G", "Vierge"]} placeholder="Facultatif" />
+                          </div>
+                        </div>
+
+                        <div>
+                          <FieldLabel required>Statut du lot</FieldLabel>
+                          <div className="grid grid-cols-2 gap-3">
+                            <RadioOption name={`lot_${i}_statut`} value="Vide" label="Vide" />
+                            <RadioOption name={`lot_${i}_statut`} value="Loué" label="Loué" />
+                          </div>
+                        </div>
+
+                        {statut === "Loué" && (
+                          <div className="pl-4 border-l-2 border-amber-500/30 space-y-4">
+                            <div>
+                              <FieldLabel>Loyer mensuel HC (€)</FieldLabel>
+                              <TextInput name={`lot_${i}_loyer`} type="number" />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <FieldLabel>Type de bail</FieldLabel>
+                                <Select name={`lot_${i}_type_bail`} options={["Nu", "Meublé"]} />
+                              </div>
+                              <div>
+                                <FieldLabel>Début du bail</FieldLabel>
+                                <TextInput name={`lot_${i}_debut_bail`} placeholder="JJ/MM/AAAA" />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {statut === "Vide" && (
+                          <div className="pl-4 border-l-2 border-amber-500/30">
+                            <FieldLabel>Loyer mensuel estimé après travaux (Meublé - €)</FieldLabel>
+                            <TextInput name={`lot_${i}_loyer_estime`} type="number" />
+                          </div>
+                        )}
+
+                        <div className="mt-2">
+                          <FieldLabel>Estimation travaux pour ce lot (€)</FieldLabel>
+                          <TextInput name={`lot_${i}_travaux`} type="number" placeholder="Facultatif" />
+                        </div>
+
+                      </div>
+                    );
+                  })}
                 </div>
-                <TextArea name="detail_lots" placeholder="Lot 1 : Type (...) | Surface (...) | État (...) | DPE (...) | Loué / Vide (...)&#10;Lot 2 : Type (...) | Surface (...) | État (...) | DPE (...) | Loué / Vide (...)&#10;..." rows={8} />
-              </div>
-              <div>
-                <FieldLabel>Des devis travaux globaux ont-ils été réalisés ?</FieldLabel>
-                <div className="space-y-3">
-                  <RadioOption name="devis_globaux" value="Oui" label="Oui" emoji="📋" />
+              )}
+
+              <div className="pt-6 mt-6 border-t border-gray-800">
+                <FieldLabel>Chiffrage global des travaux (Parties communes + Lots)</FieldLabel>
+                <div className="space-y-3 mb-4">
+                  <RadioOption name="devis_globaux" value="Oui" label="Oui, une enveloppe globale a été estimée" emoji="📋" />
                   <RadioOption name="devis_globaux" value="Non" label="Non" emoji="❌" />
                 </div>
+                {data.devis_globaux === "Oui" && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
+                    <FieldLabel>Montant total estimé (€)</FieldLabel>
+                    <TextInput name="montant_devis_globaux" placeholder="Ex: 80000" type="number" />
+                  </motion.div>
+                )}
               </div>
-              {data.devis_globaux === "Oui" && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
-                  <FieldLabel>Montant total des devis (€)</FieldLabel>
-                  <TextInput name="montant_devis_globaux" placeholder="Ex: 80000" type="number" />
-                </motion.div>
-              )}
             </div>
             <NextButton onClick={() => {
-              if (validate(["nombre_lots", "compteurs_individuels", "detail_lots"])) goTo("B4");
+              // Vérifier que type_ et statut_ sont remplis pour tous les lots = Validation dynamique
+              let valid = validate(["nombre_lots", "compteurs_individuels"]);
+              if (valid && numLots > 0) {
+                 for (let i = 1; i <= numLots; i++) {
+                    if (!data[`lot_${i}_type`] || !data[`lot_${i}_statut`]) {
+                       valid = false;
+                       // Alert is used as fallback below.
+                    }
+                 }
+              }
+              if (valid) goTo("B4");
+              else alert("Veuillez remplir les informations obligatoires (Type et Statut) pour chaque lot.");
             }} />
           </motion.div>
         );
+      }
 
       // ─── B4 : CHARGES DU BÂTIMENT ───
       case "B4":
@@ -766,8 +897,8 @@ export default function VendresonbienFunnel() {
                 <TextInput name="assurance_pno" placeholder="Facultatif — Ex: 450" type="number" />
               </div>
               <div>
-                <FieldLabel>Autres charges annuelles (€)</FieldLabel>
-                <TextInput name="autres_charges" placeholder="Électricité des communs, nettoyage, etc." type="number" />
+                <FieldLabel>Autres charges annuelles (et précisions si besoin)</FieldLabel>
+                <TextArea name="autres_charges" placeholder="Ex: Électricité des communs 300€/an, Concierge 500€/an..." rows={2} />
               </div>
             </div>
             <NextButton onClick={() => {
