@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, createContext, useContext } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -96,6 +96,118 @@ const progressB: Record<string, number> = {
   Final1: 80, Final2: 90, Submit: 95, Success: 100,
 };
 
+// ─── CONTEXT & UI COMPONENTS ────────────────────────
+const FormContext = createContext<{
+  data: FormData;
+  errors: Record<string, boolean>;
+  update: (key: keyof FormData, value: string | string[]) => void;
+  toggleArray: (key: keyof FormData, value: string) => void;
+}>({
+  data: {},
+  errors: {},
+  update: () => {},
+  toggleArray: () => {},
+});
+
+const FieldLabel = ({ children, required }: { children: React.ReactNode; required?: boolean }) => (
+  <label className="block text-sm font-medium text-gray-300 mb-2">
+    {children} {required && <span className="text-amber-500">*</span>}
+  </label>
+);
+
+const TextInput = ({ name, placeholder, type = "text", value, required }: { name: keyof FormData; placeholder?: string; type?: string; value?: string; required?: boolean }) => {
+  const { data, update, errors } = useContext(FormContext);
+  return (
+    <input
+      type={type}
+      value={value || (data[name] as string) || ""}
+      onChange={(e) => update(name, e.target.value)}
+      placeholder={placeholder}
+      className={`w-full bg-gray-900 border ${errors[name] ? "border-red-500" : "border-gray-800"} rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-amber-500 transition-colors`}
+      required={required}
+    />
+  );
+};
+
+const TextArea = ({ name, placeholder, rows = 4 }: { name: keyof FormData; placeholder?: string; rows?: number }) => {
+  const { data, update, errors } = useContext(FormContext);
+  return (
+    <textarea
+      value={(data[name] as string) || ""}
+      onChange={(e) => update(name, e.target.value)}
+      placeholder={placeholder}
+      rows={rows}
+      className={`w-full bg-gray-900 border ${errors[name] ? "border-red-500" : "border-gray-800"} rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-amber-500 transition-colors resize-none`}
+    />
+  );
+};
+
+const Select = ({ name, options, placeholder }: { name: keyof FormData; options: string[]; placeholder?: string }) => {
+  const { data, update, errors } = useContext(FormContext);
+  return (
+    <select
+      value={(data[name] as string) || ""}
+      onChange={(e) => update(name, e.target.value)}
+      className={`w-full bg-gray-900 border ${errors[name] ? "border-red-500" : "border-gray-800"} rounded-xl px-4 py-3.5 text-white focus:outline-none focus:border-amber-500 transition-colors appearance-none cursor-pointer`}
+    >
+      <option value="" className="text-gray-600">{placeholder || "Sélectionnez..."}</option>
+      {options.map((opt) => (
+        <option key={opt} value={opt}>{opt}</option>
+      ))}
+    </select>
+  );
+};
+
+const RadioOption = ({ name, value, label, emoji, description }: { name: keyof FormData; value: string; label: string; emoji?: string; description?: string }) => {
+  const { data, update, errors } = useContext(FormContext);
+  return (
+    <button
+      onClick={() => update(name, value)}
+      className={`w-full text-left bg-gray-900 hover:bg-gray-800 border-2 ${(data[name] as string) === value ? "border-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.15)]" : errors[name] ? "border-red-500/50" : "border-gray-800"} p-5 rounded-2xl transition-all hover:border-amber-500/60 group`}
+    >
+      <div className="text-lg text-white font-semibold flex items-center">
+        {emoji && <span className="text-2xl mr-3">{emoji}</span>}
+        {label}
+      </div>
+      {description && <div className="text-gray-400 text-sm mt-1 pl-9">{description}</div>}
+    </button>
+  );
+};
+
+const CheckboxOption = ({ name, value, label }: { name: keyof FormData; value: string; label: string }) => {
+  const { data, toggleArray } = useContext(FormContext);
+  const checked = ((data[name] as string[] | undefined) || []).includes(value);
+  return (
+    <button
+      onClick={() => toggleArray(name, value)}
+      className={`text-left bg-gray-900 hover:bg-gray-800 border-2 ${checked ? "border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.1)]" : "border-gray-800"} p-4 rounded-xl transition-all hover:border-amber-500/60`}
+    >
+      <div className="flex items-center gap-3">
+        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${checked ? "bg-amber-500 border-amber-500" : "border-gray-600"}`}>
+          {checked && <CheckCircle2 className="w-3.5 h-3.5 text-gray-950" />}
+        </div>
+        <span className="text-white text-sm font-medium">{label}</span>
+      </div>
+    </button>
+  );
+};
+
+const NextButton = ({ onClick, label = "Étape suivante" }: { onClick: () => void; label?: string }) => (
+  <button
+    onClick={onClick}
+    className="w-full mt-6 bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold py-4 rounded-2xl text-lg transition-all hover:scale-[1.02] shadow-[0_0_25px_rgba(245,158,11,0.2)] flex items-center justify-center"
+  >
+    {label} <ChevronRight className="ml-2 w-5 h-5" />
+  </button>
+);
+
+const ScreenTitle = ({ title, subtitle }: { title: string; subtitle?: string }) => (
+  <div className="text-center mb-8">
+    <h2 className="text-2xl md:text-3xl font-bold mb-4 text-white">{title}</h2>
+    {subtitle && <p className="text-gray-400 text-lg leading-relaxed">{subtitle}</p>}
+  </div>
+);
+
 // ─── COMPONENT ──────────────────────────────────────
 export default function VendresonbienFunnel() {
   const [currentScreen, setCurrentScreen] = useState<ScreenId>("intro");
@@ -171,92 +283,6 @@ export default function VendresonbienFunnel() {
     }
   };
 
-  // ─── SHARED UI COMPONENTS ──────────────────────────
-  const FieldLabel = ({ children, required }: { children: React.ReactNode; required?: boolean }) => (
-    <label className="block text-sm font-medium text-gray-300 mb-2">
-      {children} {required && <span className="text-amber-500">*</span>}
-    </label>
-  );
-
-  const TextInput = ({ name, placeholder, type = "text", value, required }: { name: keyof FormData; placeholder?: string; type?: string; value?: string; required?: boolean }) => (
-    <input
-      type={type}
-      value={value || (data[name] as string) || ""}
-      onChange={(e) => update(name, e.target.value)}
-      placeholder={placeholder}
-      className={`w-full bg-gray-900 border ${errors[name] ? "border-red-500" : "border-gray-800"} rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-amber-500 transition-colors`}
-      required={required}
-    />
-  );
-
-  const TextArea = ({ name, placeholder, rows = 4 }: { name: keyof FormData; placeholder?: string; rows?: number }) => (
-    <textarea
-      value={(data[name] as string) || ""}
-      onChange={(e) => update(name, e.target.value)}
-      placeholder={placeholder}
-      rows={rows}
-      className={`w-full bg-gray-900 border ${errors[name] ? "border-red-500" : "border-gray-800"} rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-amber-500 transition-colors resize-none`}
-    />
-  );
-
-  const Select = ({ name, options, placeholder }: { name: keyof FormData; options: string[]; placeholder?: string }) => (
-    <select
-      value={(data[name] as string) || ""}
-      onChange={(e) => update(name, e.target.value)}
-      className={`w-full bg-gray-900 border ${errors[name] ? "border-red-500" : "border-gray-800"} rounded-xl px-4 py-3.5 text-white focus:outline-none focus:border-amber-500 transition-colors appearance-none cursor-pointer`}
-    >
-      <option value="" className="text-gray-600">{placeholder || "Sélectionnez..."}</option>
-      {options.map((opt) => (
-        <option key={opt} value={opt}>{opt}</option>
-      ))}
-    </select>
-  );
-
-  const RadioOption = ({ name, value, label, emoji, description }: { name: keyof FormData; value: string; label: string; emoji?: string; description?: string }) => (
-    <button
-      onClick={() => update(name, value)}
-      className={`w-full text-left bg-gray-900 hover:bg-gray-800 border-2 ${(data[name] as string) === value ? "border-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.15)]" : errors[name] ? "border-red-500/50" : "border-gray-800"} p-5 rounded-2xl transition-all hover:border-amber-500/60 group`}
-    >
-      <div className="text-lg text-white font-semibold flex items-center">
-        {emoji && <span className="text-2xl mr-3">{emoji}</span>}
-        {label}
-      </div>
-      {description && <div className="text-gray-400 text-sm mt-1 pl-9">{description}</div>}
-    </button>
-  );
-
-  const CheckboxOption = ({ name, value, label }: { name: keyof FormData; value: string; label: string }) => {
-    const checked = ((data[name] as string[] | undefined) || []).includes(value);
-    return (
-      <button
-        onClick={() => toggleArray(name, value)}
-        className={`text-left bg-gray-900 hover:bg-gray-800 border-2 ${checked ? "border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.1)]" : "border-gray-800"} p-4 rounded-xl transition-all hover:border-amber-500/60`}
-      >
-        <div className="flex items-center gap-3">
-          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${checked ? "bg-amber-500 border-amber-500" : "border-gray-600"}`}>
-            {checked && <CheckCircle2 className="w-3.5 h-3.5 text-gray-950" />}
-          </div>
-          <span className="text-white text-sm font-medium">{label}</span>
-        </div>
-      </button>
-    );
-  };
-
-  const NextButton = ({ onClick, label = "Étape suivante" }: { onClick: () => void; label?: string }) => (
-    <button
-      onClick={onClick}
-      className="w-full mt-6 bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold py-4 rounded-2xl text-lg transition-all hover:scale-[1.02] shadow-[0_0_25px_rgba(245,158,11,0.2)] flex items-center justify-center"
-    >
-      {label} <ChevronRight className="ml-2 w-5 h-5" />
-    </button>
-  );
-
-  const ScreenTitle = ({ title, subtitle }: { title: string; subtitle?: string }) => (
-    <div className="text-center mb-8">
-      <h2 className="text-2xl md:text-3xl font-bold mb-4 text-white">{title}</h2>
-      {subtitle && <p className="text-gray-400 text-lg leading-relaxed">{subtitle}</p>}
-    </div>
-  );
 
   // ─── SCREEN RENDERER ──────────────────────────────
   const renderScreen = () => {
@@ -844,10 +870,11 @@ export default function VendresonbienFunnel() {
 
   // ─── MAIN RENDER ──────────────────────────────────
   return (
-    <div className="min-h-screen py-10 px-4 flex flex-col items-center justify-center relative w-full bg-gray-950 font-sans">
-      {/* Progress bar */}
-      {currentScreen !== "intro" && currentScreen !== "Success" && (
-        <div className="fixed top-0 left-0 right-0 z-50">
+    <FormContext.Provider value={{ data, errors, update, toggleArray }}>
+      <div className="min-h-screen py-10 px-4 flex flex-col items-center justify-center relative w-full bg-gray-950 font-sans">
+        {/* Progress bar */}
+        {currentScreen !== "intro" && currentScreen !== "Success" && (
+          <div className="fixed top-0 left-0 right-0 z-50">
           <div className="h-1 bg-gray-800">
             <motion.div
               className="h-full bg-gradient-to-r from-amber-500 to-amber-400"
@@ -877,14 +904,15 @@ export default function VendresonbienFunnel() {
         </AnimatePresence>
       </div>
 
-      {/* MyBase branding */}
-      {currentScreen !== "Success" && (
-        <div className="mt-12 text-center">
-          <p className="text-gray-700 text-xs">
-            MyBase — Réseau d&apos;investisseurs qualifiés
-          </p>
-        </div>
-      )}
-    </div>
+        {/* MyBase branding */}
+        {currentScreen !== "Success" && (
+          <div className="mt-12 text-center">
+            <p className="text-gray-700 text-xs">
+              MyBase — Réseau d&apos;investisseurs qualifiés
+            </p>
+          </div>
+        )}
+      </div>
+    </FormContext.Provider>
   );
 }
